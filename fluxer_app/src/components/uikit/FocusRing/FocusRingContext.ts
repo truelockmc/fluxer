@@ -48,6 +48,39 @@ export class FocusRingContextManager {
 
 	invalidate: () => void = () => null;
 
+	private scrollTargets: Array<Element | Window> = [];
+
+	private handleScroll = () => {
+		this.invalidate();
+	};
+
+	private attachScrollListeners() {
+		this.detachScrollListeners();
+
+		if (this.targetElement == null) return;
+
+		let current: Element | null = this.targetElement.parentElement;
+		while (current != null) {
+			const style = window.getComputedStyle(current);
+			const overflow = style.overflow + style.overflowX + style.overflowY;
+			if (/auto|scroll/.test(overflow)) {
+				current.addEventListener('scroll', this.handleScroll, {passive: true});
+				this.scrollTargets.push(current);
+			}
+			if (current === this.container) break;
+			current = current.parentElement;
+		}
+		window.addEventListener('scroll', this.handleScroll, {passive: true});
+		this.scrollTargets.push(window);
+	}
+
+	private detachScrollListeners() {
+		for (const target of this.scrollTargets) {
+			target.removeEventListener('scroll', this.handleScroll);
+		}
+		this.scrollTargets = [];
+	}
+
 	setContainer(element: Element | null) {
 		this.container = element;
 	}
@@ -60,10 +93,12 @@ export class FocusRingContextManager {
 		this.offset = opts.offset ?? 0;
 		this.zIndex = opts.zIndex;
 		setActiveRingContextManager(this);
+		this.attachScrollListeners();
 		this.invalidate();
 	}
 
 	hide() {
+		this.detachScrollListeners();
 		this.targetElement = undefined;
 		this.targetAncestry = undefined;
 		this.boundingBox = undefined;
